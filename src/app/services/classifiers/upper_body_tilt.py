@@ -1,0 +1,14 @@
+from typing import Dict, Any
+
+from .base import ClassificationResult, ok
+
+CODE = "UPPER_BODY_TILT"
+
+
+def classify(metrics: Dict[str, Any]) -> ClassificationResult:
+    """
+    상체 기울임 감지 분류기.
+    2단계에서는 항상 위반 아님으로 반환한다.
+    """
+    # TODO: shoulder_height_delta 메트릭 기반으로 구현
+    return ok(CODE)
