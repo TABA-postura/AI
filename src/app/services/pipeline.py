@@ -1,4 +1,5 @@
 from typing import Any, Dict, List
+import time
 
 from . import detector, metrics as metrics_mod, tracker, calibration, aggregator, advisor
 from .classifiers import (
@@ -15,17 +16,35 @@ from .classifiers.base import ClassificationResult
 
 def run(image_bytes: bytes) -> Dict[str, Any]:
     """
-    메인 파이프라인: 이미지 -> 랜드마크 -> 메트릭 -> 분류기 -> 최종 상태.
+    메인 파이프라인:
+    이미지 -> (detector) -> posture_data
+           -> (tracker)  -> 스무딩
+           -> (metrics)  -> 숫자 메트릭
+           -> (calibration) -> 개인 기준선 보정
+           -> (classifiers/aggregator/advisor)
     """
+
+    # 현재 시각(ms) - 나중에 should_process 등에서 쓸 수 있음
+    now_ms = int(time.time() * 1000)
+
     # 1) 포즈 랜드마크 추출
     posture_data = detector.detect(image_bytes)
 
-    # 2) 트래킹/스무딩 & 캘리브레이션 (지금은 더미)
+    # (실시간 스트림 연동 시)
+    # if not tracker.should_process(now_ms):
+    #     이전 결과를 재사용하거나 바로 반환하는 로직을 넣을 수 있음.
+
+    # 2) 트래킹/스무딩
     smoothed = tracker.smooth_landmarks(posture_data)
+
+    # 3) 메트릭 계산
     raw_metrics = metrics_mod.compute(smoothed)
+
+    # 4) baseline 업데이트 + 보정 적용
+    calibration.update_baseline(raw_metrics)
     calibrated_metrics = calibration.apply_baseline(raw_metrics)
 
-    # 3) 분류기들 실행
+    # 5) 분류기들 실행
     results: List[ClassificationResult] = [
         uneven_shoulders.classify(calibrated_metrics),
         upper_body_tilt.classify(calibrated_metrics),
@@ -36,7 +55,7 @@ def run(image_bytes: bytes) -> Dict[str, Any]:
         forward_head.classify(calibrated_metrics),
     ]
 
-    # 4) 최종 상태 집계 + 코칭 문구 생성
+    # 6) 최종 상태 집계 + 코칭 문구 생성
     aggregate_result = aggregator.aggregate(results)
     advices = advisor.advise(aggregate_result)
 
@@ -44,7 +63,10 @@ def run(image_bytes: bytes) -> Dict[str, Any]:
         "state": aggregate_result.get("state", "GOOD"),
         "violations": aggregate_result.get("violations", []),
         "advices": advices,
-        "metrics": calibrated_metrics,  # 이 줄 있으면 디버깅에 좋음
+        "metrics": calibrated_metrics,  # 디버깅 용
+        "timestamp_ms": now_ms, # 현재 시각
     }
+
+    # TODO: exporter.publish_to_backend(response)
 
     return response
