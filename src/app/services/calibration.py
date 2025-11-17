@@ -9,9 +9,8 @@ _MAX_SAMPLES = 30
 
 def update_baseline(metrics: Dict[str, float]) -> None:
     """
-    세션 초반 N프레임 동안 메트릭의 평균을 구해 baseline으로 사용한다.
-    - 어깨/머리 같은 메트릭도 넣어둘 수 있지만,
-      실제로는 face_scale, distance 계열 메트릭에 더 유용하다.
+    세션 초반 N프레임 동안 face_scale_raw 등을 모아서 baseline으로 사용한다.
+    - 지금은 화면과의 거리(얼굴 크기)에만 baseline 적용.
 
     """
     global _baseline, _sample_count
@@ -19,19 +18,27 @@ def update_baseline(metrics: Dict[str, float]) -> None:
     if not metrics:
         return
 
-    # baseline을 어느 정도 모으면 더 이상 업데이트하지 않음
+    # baseline에 사용할 key들
+    keys = ["face_scale_raw"]
+    has_any = any(k in metrics for k in keys)
+    if not has_any:
+        return
+    
     if _sample_count >= _MAX_SAMPLES:
         return
 
     _sample_count += 1
 
     if not _baseline:
-        # 첫 샘플이면 그대로 복사
-        _baseline = dict(metrics)
+        # 첫 샘플이면 필요한 key만 복사
+        _baseline = {k: metrics[k] for k in keys if k in metrics}
         return
 
     # running mean (증분 평균)
-    for key, value in metrics.items():
+    for key in keys:
+        if key not in metrics:
+            continue
+        value = metrics[key]
         prev = _baseline.get(key, value)
         new_val = prev + (value - prev) / float(_sample_count)
         _baseline[key] = new_val
@@ -39,23 +46,21 @@ def update_baseline(metrics: Dict[str, float]) -> None:
 
 def apply_baseline(metrics: Dict[str, float]) -> Dict[str, float]:
     """
-    baseline 대비 변화량으로 보정할 메트릭에만 baseline을 적용한다.
+    baseline 대비 변화량으로 face_scale_delta를 계산해 추가한다.
 
-    현재 단계에서는 face_scale 등 개인차가 큰 메트릭 위주로 사용하고,
-    어깨 관련 메트릭(shoulder_height_diff / shoulder_line_angle_deg)은
-    그대로 사용하는 것이 더 자연스러워서 보정하지 않는다.
+    - face_scale_raw: 원래 절대값 (0~1)
+    - face_scale_delta: baseline 대비 증가량 (양수면 화면에 더 가까워진 것)
     """
     if not _baseline:
         return metrics
 
     adjusted = dict(metrics)
 
-    # 나중에 추가할 '개인차 큰 메트릭' 리스트 (예: 화면과의 거리)
-    CALIBRATED_KEYS = {"face_scale"}
+    base_face = _baseline.get("face_scale_raw")
+    cur_face = metrics.get("face_scale_raw")
 
-    for key in CALIBRATED_KEYS:
-        if key in adjusted and key in _baseline:
-            adjusted[key] = adjusted[key] - _baseline[key]
+    if base_face is not None and cur_face is not None:
+        adjusted["face_scale_delta"] = cur_face - base_face
 
     return adjusted
 
