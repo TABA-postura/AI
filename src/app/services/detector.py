@@ -5,6 +5,7 @@ import numpy as np
 import mediapipe as mp
 
 mp_pose = mp.solutions.pose
+mp_hands = mp.solutions.hands
 
 # 프로세스 전체에서 재사용할 Pose 인스턴스
 _pose = mp_pose.Pose(
@@ -12,6 +13,14 @@ _pose = mp_pose.Pose(
     model_complexity=1,
     enable_segmentation=False,
     min_detection_confidence = 0.5,
+)
+
+# Hands 인스턴스 (손 전용)
+_hands = mp_hands.Hands(
+    static_image_mode=True,
+    max_num_hands=2,
+    min_detection_confidence=0.5,
+    min_tracking_confidence=0.5,
 )
 
 def _decode_image(image_bytes: bytes) -> np.ndarray:
@@ -26,15 +35,18 @@ def _decode_image(image_bytes: bytes) -> np.ndarray:
 
 def detect(image_bytes: bytes) -> Dict[str, Any]:
     """
-    이미지 바이트를 받아 MediaPipe Pose로 랜드마크를 추출한다.
+    이미지 바이트를 받아 MediaPipe Pose + Hands로 랜드마크를 추출한다.
 
     반환 형식:
     {
         "image_width": int,
         "image_height": int,
         "landmarks": {
-            "LEFT_SHOULDER": {"x": float, "y": float, "z": float, "visibility": float},
+            "LEFT_SHOULDER": {...},
+            "RIGHT_SHOULDER": {...},
             ...
+            "LEFT_HAND_WRIST": {...},
+            "RIGHT_HAND_WRIST": {...},
         }
     }
     """
@@ -42,26 +54,45 @@ def detect(image_bytes: bytes) -> Dict[str, Any]:
     h, w, _ = img_bgr.shape
 
     img_rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
-    results = _pose.process(img_rgb)
 
-    if not results.pose_landmarks:
-        # 사람 못 찾았을 때
-        return {
-            "image_width": w,
-            "image_height": h,
-            "landmarks": {},
-        }
+    # 1) 포즈 추출
+    pose_results = _pose.process(img_rgb)
 
     landmarks: Dict[str, Dict[str, float]] = {}
-    for idx, lm in enumerate(results.pose_landmarks.landmark):
-        # mp_pose.PoseLandmark(idx) -> Enum, .name 하면 "LEFT_SHOULDER" 이런 문자열 됨
-        name = mp_pose.PoseLandmark(idx).name
-        landmarks[name] = {
-            "x": lm.x,            # 0~1, 이미지 너비 기준 정규화
-            "y": lm.y,            # 0~1, 이미지 높이 기준 정규화 (위=0, 아래=1)
-            "z": lm.z,            # 대략적인 깊이
-            "visibility": lm.visibility,
-        }
+
+    if pose_results.pose_landmarks:
+        for idx, lm in enumerate(pose_results.pose_landmarks.landmark):
+            name = mp_pose.PoseLandmark(idx).name  # 예: "LEFT_SHOULDER"
+            landmarks[name] = {
+                "x": lm.x,
+                "y": lm.y,
+                "z": lm.z,
+                "visibility": lm.visibility,
+            }
+
+    # 2) 손 추출
+    hands_results = _hands.process(img_rgb)
+
+    if hands_results.multi_hand_landmarks and hands_results.multi_handedness:
+        for hand_lms, handedness in zip(
+            hands_results.multi_hand_landmarks,
+            hands_results.multi_handedness,
+        ):
+            label = handedness.classification[0].label  # "Left" or "Right"
+
+            if label == "Left":
+                key = "LEFT_HAND_WRIST"
+            else:
+                key = "RIGHT_HAND_WRIST"
+
+            wrist = hand_lms.landmark[mp_hands.HandLandmark.WRIST]
+            # Pose와 동일하게 x,y,z는 0~1 정규화 좌표
+            landmarks[key] = {
+                "x": wrist.x,
+                "y": wrist.y,
+                "z": wrist.z,
+                "visibility": 1.0,
+            }
 
     return {
         "image_width": w,

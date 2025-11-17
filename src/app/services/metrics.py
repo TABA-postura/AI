@@ -70,10 +70,25 @@ def compute(posture_data: Dict[str, Any]) -> Dict[str, float]:
     landmarks = _get_landmarks(posture_data)
     metrics: Dict[str, float] = {}
 
-    # 어깨 포인트 가져오기
+    # --- 공통으로 쓸 포인트들 미리 꺼내기 ---
     left_shoulder = _get_point(landmarks, "LEFT_SHOULDER")
     right_shoulder = _get_point(landmarks, "RIGHT_SHOULDER")
 
+    left_ear = _get_point(landmarks, "LEFT_EAR")
+    right_ear = _get_point(landmarks, "RIGHT_EAR")
+
+    left_eye = _get_point(landmarks, "LEFT_EYE")
+    right_eye = _get_point(landmarks, "RIGHT_EYE")
+
+    left_elbow = _get_point(landmarks, "LEFT_ELBOW")
+    right_elbow = _get_point(landmarks, "RIGHT_ELBOW")
+
+    left_wrist = _get_point(landmarks, "LEFT_WRIST")
+    right_wrist = _get_point(landmarks, "RIGHT_WRIST")
+
+    nose = _get_point(landmarks, "NOSE")
+
+    # --- 어깨 관련 메트릭 ---
     if left_shoulder and right_shoulder:
         lx, ly = left_shoulder.get("x"), left_shoulder.get("y")
         rx, ry = right_shoulder.get("x"), right_shoulder.get("y")
@@ -89,25 +104,7 @@ def compute(posture_data: Dict[str, Any]) -> Dict[str, float]:
             dy = ry - ly
             metrics["shoulder_line_angle_deg"] = _angle_deg(dx, dy)
 
-            # 둘 다 0이면 각도 계산 의미 없음 → 그냥 0도 취급
-            if dx == 0 and dy == 0:
-                angle_deg = 0.0
-            else:
-                angle_rad = math.atan2(dy, dx)
-                angle_deg = math.degrees(angle_rad)
-
-                # 180도(← 방향 수평)도 사실 "기울기는 0도"로 봐야 함
-                if angle_deg > 90:
-                    angle_deg -= 180
-                elif angle_deg < -90:
-                    angle_deg += 180
-
-            metrics["shoulder_line_angle_deg"] = float(angle_deg)
-
     # --- 머리 기울기 (좌/우 귀 기준) ---
-    left_ear = _get_point(landmarks, "LEFT_EAR")
-    right_ear = _get_point(landmarks, "RIGHT_EAR")
-
     if left_ear and right_ear:
         lx, ly = left_ear.get("x"), left_ear.get("y")
         rx, ry = right_ear.get("x"), right_ear.get("y")
@@ -118,9 +115,6 @@ def compute(posture_data: Dict[str, Any]) -> Dict[str, float]:
             metrics["head_line_angle_deg"] = _angle_deg(dx, dy)
 
     # --- 얼굴 크기 (눈 사이 거리) ---
-    left_eye = _get_point(landmarks, "LEFT_EYE")
-    right_eye = _get_point(landmarks, "RIGHT_EYE")
-
     if left_eye and right_eye:
         lx, ly = left_eye.get("x"), left_eye.get("y")
         rx, ry = right_eye.get("x"), right_eye.get("y")
@@ -140,29 +134,32 @@ def compute(posture_data: Dict[str, Any]) -> Dict[str, float]:
         return float(z) if z is not None else None
 
     fwd_candidates = []
+
+    # 왼쪽 기준
     if left_shoulder and left_ear:
         sz = _z("LEFT_SHOULDER")
         ez = _z("LEFT_EAR")
         if sz is not None and ez is not None:
-            fwd_candidates.append(sz - ez)  # 양수일수록 머리가 앞으로
+            # z는 카메라 쪽이 더 음수이므로,
+            # (귀 z - 어깨 z)는 거북목일 때 음수가 됨.
+            dz = ez - sz            # 음수이면 머리가 앞으로 나온 상태
+            amount = max(-dz, 0.0)  # 앞으로 나온 "양"을 양수로 변환
+            fwd_candidates.append(amount)
 
+    # 오른쪽 기준
     if right_shoulder and right_ear:
         sz = _z("RIGHT_SHOULDER")
         ez = _z("RIGHT_EAR")
         if sz is not None and ez is not None:
-            fwd_candidates.append(sz - ez)
+            dz = ez - sz
+            amount = max(-dz, 0.0)
+            fwd_candidates.append(amount)
 
     if fwd_candidates:
-        # 음수는 뒤로 간 것으로 취급하고, 0 이상만 남김
-        value = max(max(fwd_candidates), 0.0)
-        metrics["forward_head_z_diff"] = float(value)
+        # 양수가 클수록 거북목 정도가 심한 것
+        metrics["forward_head_amount"] = float(max(fwd_candidates))
 
     # --- 팔꿈치/손목 높이 차이 (기대기/팔 괴기 탐지용 보조 신호) ---
-    left_elbow = _get_point(landmarks, "LEFT_ELBOW")
-    right_elbow = _get_point(landmarks, "RIGHT_ELBOW")
-    left_wrist = _get_point(landmarks, "LEFT_WRIST")
-    right_wrist = _get_point(landmarks, "RIGHT_WRIST")
-
     if left_elbow and right_elbow:
         ley = left_elbow.get("y")
         rey = right_elbow.get("y")
@@ -174,5 +171,32 @@ def compute(posture_data: Dict[str, Any]) -> Dict[str, float]:
         rwy = right_wrist.get("y")
         if None not in (lwy, rwy):
             metrics["wrist_height_diff"] = float(abs(lwy - rwy))
+
+    # --- 손이 얼굴에 얼마나 가까운지 (팔 지지 자세 감지용) ---
+    # 우선순위: Hands 결과(LEFT_HAND_WRIST/RIGHT_HAND_WRIST) > Pose 결과(LEFT_WRIST/RIGHT_WRIST)
+    hand_left = _get_point(landmarks, "LEFT_HAND_WRIST") or _get_point(landmarks, "LEFT_WRIST")
+    hand_right = _get_point(landmarks, "RIGHT_HAND_WRIST") or _get_point(landmarks, "RIGHT_WRIST")
+    
+    if nose:
+        nx, ny = nose.get("x"), nose.get("y")
+
+        if None not in (nx, ny):
+            # 왼쪽 손
+            if hand_left:
+                lx, ly = hand_left.get("x"), hand_left.get("y")
+                if None not in (lx, ly):
+                    dx = lx - nx
+                    dy = ly - ny
+                    dist = math.sqrt(dx * dx + dy * dy)
+                    metrics["hand_face_dist_left"] = float(dist)
+
+            # 오른쪽 손
+            if hand_right:
+                rx, ry = hand_right.get("x"), hand_right.get("y")
+                if None not in (rx, ry):
+                    dx = rx - nx
+                    dy = ry - ny
+                    dist = math.sqrt(dx * dx + dy * dy)
+                    metrics["hand_face_dist_right"] = float(dist)
 
     return metrics
