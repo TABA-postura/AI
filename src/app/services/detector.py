@@ -8,6 +8,7 @@ def detect(image_bytes: bytes) -> Dict[str, Any]:
     """
     # TODO: MediaPipe Pose 연동
     return {
-        "landmarks": [],
-        "image_size": None,
+        "landmarks": {}, # 추후에 []로 수정해야 함
+        "image_width": None,
+        "image_height": None,
     }

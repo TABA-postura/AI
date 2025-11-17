@@ -45,6 +45,7 @@ def run(image_bytes: bytes) -> Dict[str, Any]:
         "state": aggregate_result.get("state", "GOOD"),
         "violations": aggregate_result.get("violations", []),
         "advices": advices,
+        "metrics": calibrated_metrics, # 디버깅용
     }
 
     # 추후 exporter로 BE에 전송 예정
