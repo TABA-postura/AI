@@ -68,6 +68,12 @@ def compute(posture_data: Dict[str, Any]) -> Dict[str, float]:
                 angle_rad = math.atan2(dy, dx)
                 angle_deg = math.degrees(angle_rad)
 
+                # 180도(← 방향 수평)도 사실 "기울기는 0도"로 봐야 함
+                if angle_deg > 90:
+                    angle_deg -= 180
+                elif angle_deg < -90:
+                    angle_deg += 180
+
             metrics["shoulder_line_angle_deg"] = float(angle_deg)
 
     # 앞으로 head, too_close 등 메트릭도 여기서 계속 추가할 예정

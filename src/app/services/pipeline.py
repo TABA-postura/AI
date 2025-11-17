@@ -16,17 +16,16 @@ from .classifiers.base import ClassificationResult
 def run(image_bytes: bytes) -> Dict[str, Any]:
     """
     메인 파이프라인: 이미지 -> 랜드마크 -> 메트릭 -> 분류기 -> 최종 상태.
-    2단계에서는 모두 더미 구현이라 항상 GOOD만 나온다.
     """
-    # 1) 포즈 랜드마크 추출 (dummy)
-    landmarks = detector.detect(image_bytes)
+    # 1) 포즈 랜드마크 추출
+    posture_data = detector.detect(image_bytes)
 
-    # 2) 트래킹/스무딩 & 캘리브레이션 (dummy)
-    smoothed = tracker.smooth_landmarks(landmarks)
+    # 2) 트래킹/스무딩 & 캘리브레이션 (지금은 더미)
+    smoothed = tracker.smooth_landmarks(posture_data)
     raw_metrics = metrics_mod.compute(smoothed)
     calibrated_metrics = calibration.apply_baseline(raw_metrics)
 
-    # 3) 분류기들 실행 (dummy 결과)
+    # 3) 분류기들 실행
     results: List[ClassificationResult] = [
         uneven_shoulders.classify(calibrated_metrics),
         upper_body_tilt.classify(calibrated_metrics),
@@ -45,10 +44,7 @@ def run(image_bytes: bytes) -> Dict[str, Any]:
         "state": aggregate_result.get("state", "GOOD"),
         "violations": aggregate_result.get("violations", []),
         "advices": advices,
-        "metrics": calibrated_metrics, # 디버깅용
+        "metrics": calibrated_metrics,  # 이 줄 있으면 디버깅에 좋음
     }
-
-    # 추후 exporter로 BE에 전송 예정
-    # exporter.publish_to_backend(response)
 
     return response
