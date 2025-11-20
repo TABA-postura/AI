@@ -1,25 +1,27 @@
-from fastapi import APIRouter, UploadFile, File
+from fastapi import APIRouter, UploadFile, File, Form
 
-from app.services import pipeline
+from ...services import pipeline
 
-router = APIRouter()
+router = APIRouter(prefix="/posture", tags=["posture"])
 
-@router.get("/health")
-async def health_check():
+@router.post("/analyze")
+async def analyze_posture(
+    userId: int = Form(...),
+    sessionId: int = Form(...),
+    file: UploadFile = File(...),
+):
     """
-    AI 서버 헬스 체크용 엔드포인트.
-    BE나 FE에서 'AI 서버 살아 있나?' 확인할 때 사용.
+    - React가 FormData로 보내는 구조 예시:
+      formData.append("userId", userId);
+      formData.append("sessionId", sessionId);
+      formData.append("file", imageBlob);
     """
-    return {"status": "ok"}
+    image_bytes = await file.read()
 
-@router.post("/anlyze")
-async def analyze_posture(image: UploadFile = File(...)):
-    """
-    단일 이미지에 대한 자세 분석 엔드포인트.
+    result = pipeline.run(
+        image_bytes=image_bytes,
+        user_id=userId,
+        session_id=sessionId,
+    )
 
-    2단계에서는 이미지 내용을 실제로 분석하지 않고,
-    파이프라인을 한 번 태운 뒤 더미 결과를 반환한다.
-    """
-    image_bytes = await image.read()
-    result = pipeline.run(image_bytes)
     return result
