@@ -1,10 +1,11 @@
 from fastapi import APIRouter, UploadFile, File, Form
 
 from ...services import pipeline, tracker, calibration
+from ..schemas import AnalyzeResponse
 
 router = APIRouter(prefix="/posture", tags=["posture"])
 
-@router.post("/analyze")
+@router.post("/analyze", response_model=AnalyzeResponse)
 async def analyze_posture(
     userId: int = Form(...),
     sessionId: int = Form(...),

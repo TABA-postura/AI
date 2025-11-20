@@ -1,18 +1,16 @@
 import json
 import logging
-import os
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
 import requests
 
+from app.core.config import settings
+
 logger = logging.getLogger(__name__)
 
-# Spring Boot 서버 주소 (로컬 기준 기본값)
-SPRING_BASE_URL = os.getenv("SPRING_BASE_URL", "http://localhost:8080")
-AI_LOG_PATH = os.getenv("SPRING_AI_LOG_PATH", "/ai/log")
-
-LOG_URL = f"{SPRING_BASE_URL.rstrip('/')}{AI_LOG_PATH}"
+# Spring Boot 서버 주소
+LOG_URL = f"{settings.spring_base_url.rstrip('/')}{settings.spring_ai_log_path}"
 
 def _build_landmark_payload(result: Dict[str, Any]) -> Optional[str]:
     """
