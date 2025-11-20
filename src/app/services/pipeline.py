@@ -2,6 +2,8 @@ from typing import Any, Dict, List
 import time
 import logging
 
+from app.core.logging import log_inference
+
 from . import (
     detector,
     metrics as metrics_mod,
@@ -67,13 +69,25 @@ def run(
     aggregate_result = aggregator.aggregate(results)
     advices = advisor.advise(aggregate_result)
 
+    violation_details = aggregate_result.get("violation_details", [])
+
     response: Dict[str, Any] = {
         "state": aggregate_result.get("state", "GOOD"),
         "violations": aggregate_result.get("violations", []),
+        "violation_details": violation_details,
         "advices": advices,
         "metrics": calibrated_metrics,  # 디버깅 용
         "timestamp_ms": now_ms, # 현재 시각
     }
+
+    # JSON 로그로 남기기
+    log_inference(
+        user_id=user_id,
+        session_id=session_id,
+        state=response["state"],
+        violations=response["violations"],
+        violation_details=violation_details,
+    )
 
     # 백엔드 로그 전송 (user_id, session_id가 있을 때만)
     if user_id is not None and session_id is not None:
@@ -86,4 +100,5 @@ def run(
         except Exception as exc:  # 방어용
             logger.warning("Failed to export posture log: %s", exc)
 
+    # TODO: exporter.publish_to_backend(response)
     return response

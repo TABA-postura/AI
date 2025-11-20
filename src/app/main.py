@@ -1,16 +1,24 @@
 from fastapi import FastAPI
+
 from app.api.routers import posture
-
-app = FastAPI(
-    title="Postura AI Server",
-    description="웹캠 기반 자세 분석 AI 서버 (FastAPI)",
-    version="0.1.0",
-)
-
-# 라우터 등록
-app.include_router(posture.router, prefix="/posture", tags=["posture"])
+from app.core.config import settings
+from app.core.logging import setup_logging
+from app.core.errors import init_exception_handlers
 
 
-@app.get("/")
-async def root():
-    return {"message": "Postura AI server is running"}
+def create_app() -> FastAPI:
+    # 로깅 설정
+    setup_logging()
+
+    app = FastAPI(title=settings.app_name)
+
+    # 라우터 등록
+    app.include_router(posture.router)
+
+    # 전역 예외 핸들러 등록
+    init_exception_handlers(app)
+
+    return app
+
+
+app = create_app()

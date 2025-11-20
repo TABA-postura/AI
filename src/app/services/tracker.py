@@ -1,7 +1,9 @@
 from typing import Any, Dict, Optional
 
+from app.core.config import settings
+
 # 타깃 FPS (실시간 스트림에서 쓸 예정)
-TARGET_FPS = 3.0
+TARGET_FPS = settings.target_fps
 _MIN_INTERVAL_MS = int(1000 / TARGET_FPS)
 
 # 프레임 간 시간 추적용
