@@ -4,7 +4,7 @@ from math import fabs
 from .base import ClassificationResult, ok
 
 CODE = "HEAD_TILT"
-THRESHOLD_DEG = 8.0  # 8도 이상 기울면 경고
+THRESHOLD_DEG = 10.0  # 10도 이상 기울면 경고
 
 def classify(metrics: Dict[str, Any]) -> ClassificationResult:
     """
