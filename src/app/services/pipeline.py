@@ -1,7 +1,19 @@
 from typing import Any, Dict, List
 import time
+import logging
 
-from . import detector, metrics as metrics_mod, tracker, calibration, aggregator, advisor
+from . import (
+    detector,
+    metrics as metrics_mod,
+    tracker,
+    calibration,
+    aggregator,
+    advisor,
+    exporter,
+)
+
+logger = logging.getLogger(__name__)
+
 from .classifiers import (
     uneven_shoulders,
     upper_body_tilt,
@@ -14,15 +26,11 @@ from .classifiers import (
 from .classifiers.base import ClassificationResult
 
 
-def run(image_bytes: bytes) -> Dict[str, Any]:
-    """
-    메인 파이프라인:
-    이미지 -> (detector) -> posture_data
-           -> (tracker)  -> 스무딩
-           -> (metrics)  -> 숫자 메트릭
-           -> (calibration) -> 개인 기준선 보정
-           -> (classifiers/aggregator/advisor)
-    """
+def run(
+    image_bytes: bytes,
+    user_id: int | None = None,
+    session_id: int | None = None,
+) -> Dict[str, Any]:
 
     # 현재 시각(ms) - 나중에 should_process 등에서 쓸 수 있음
     now_ms = int(time.time() * 1000)
@@ -67,6 +75,15 @@ def run(image_bytes: bytes) -> Dict[str, Any]:
         "timestamp_ms": now_ms, # 현재 시각
     }
 
-    # TODO: exporter.publish_to_backend(response)
+    # 백엔드 로그 전송 (user_id, session_id가 있을 때만)
+    if user_id is not None and session_id is not None:
+        try:
+            exporter.publish_to_backend(
+                user_id=user_id,
+                session_id=session_id,
+                result=response,
+            )
+        except Exception as exc:  # 방어용
+            logger.warning("Failed to export posture log: %s", exc)
 
     return response
