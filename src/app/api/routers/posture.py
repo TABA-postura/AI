@@ -17,12 +17,6 @@ async def analyze_posture(
         tracker.reset()
         calibration.reset()
 
-    """
-    - React가 FormData로 보내는 구조 예시:
-      formData.append("userId", userId);
-      formData.append("sessionId", sessionId);
-      formData.append("file", imageBlob);
-    """
     image_bytes = await file.read()
 
     result = pipeline.run(

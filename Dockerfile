@@ -1,28 +1,31 @@
-# 베이스 이미지: Python 3.11 + 최소 리눅스
+# 1. 베이스 이미지 (가벼운 Python 이미지)
 FROM python:3.11-slim
 
-# 컨테이너 안에서 작업 디렉터리
-WORKDIR /app
-
-# 필수 OS 라이브러리 (mediapipe / opencv가 필요로 하는 것들)
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
-    libglib2.0-0 libsm6 libxext6 libxrender1 \
+# 2. OpenCV가 필요로 하는 시스템 라이브러리 설치
+RUN apt-get update && apt-get install -y \
+    libgl1 \
+    libglib2.0-0 \
  && rm -rf /var/lib/apt/lists/*
 
-# 파이썬 패키지 설치
-COPY requirements.txt .
+# 3. 작업 디렉토리 생성
+WORKDIR /app
 
-RUN pip install --no-cache-dir -r requirements.txt
+# 4. 파이썬 의존성 설치
+COPY requirements.txt ./
+RUN pip install --no-cache-dir --upgrade pip \
+ && pip install --no-cache-dir -r requirements.txt
 
-# 애플리케이션 코드 복사
-COPY src ./src
+# 5. 나머지 소스 코드 복사
+COPY . .
 
-# 로그 플러시 빨리 되도록
-ENV PYTHONUNBUFFERED=1
+# 6. uvicorn을 src/app/main.py 기준으로 실행할 거라 src를 워킹 디렉토리로
+WORKDIR /app/src
 
-# 컨테이너가 열어 줄 포트
+# 7. 컨테이너에서 쓸 포트
 EXPOSE 8000
 
-# 컨테이너가 시작될 때 실행할 명령
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--app-dir", "src"]
+# 8. (선택) Spring URL 환경변수 – 나중에 docker run 할 때 -e로 덮어씌워도 됨
+# ENV SPRING_BASE_URL=http://backend:8080
+
+# 9. 컨테이너 시작 시 실행할 명령
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
