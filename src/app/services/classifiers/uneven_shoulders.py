@@ -4,26 +4,40 @@ from .base import ClassificationResult, ok
 
 CODE = "UNEQUAL_SHOULDERS"
 
-# 어깨 높이 차이가 프레임 높이의 5% 이상이면 경고로 본다.
-THRESHOLD = 0.04  # 6%
+# baseline 대비 어깨 높이 차이가 이 이상이면 위반
+DELTA_THRESHOLD = 0.01   # 1% 이상 증가 시
+
+# baseline 없을 때 절대 차이 기준
+ABS_THRESHOLD = 0.06     # 6% 이상이면 위반
 
 def classify(metrics: Dict[str, Any]) -> ClassificationResult:
     """
     왼/오 어깨 y좌표 차이 기반으로 한쪽 어깨 기울임 감지.
 
-    metrics["shoulder_height_diff"]:
-      - detector + metrics에서 계산한 y좌표 차이 절대값 (0~1)
+    - shoulder_height_delta: baseline 대비 y좌표 차이 증가량 (0~1)
+    - shoulder_height_diff: 절대 y좌표 차이 (0~1)
     """
-    value = metrics.get("shoulder_height_diff")
-    if value is None:
-        # 메트릭이 없으면 판단 불가 -> 일단 ok 처리
+    diff = metrics.get("shoulder_height_diff")
+    delta = metrics.get("shoulder_height_delta")
+
+    # 1) baseline이 있으면 delta 기준
+    if delta is not None:
+        is_violation = delta > DELTA_THRESHOLD
+        if not is_violation:
+            return ok(CODE)
+
+        norm = max(0.0, min(1.0, (delta - DELTA_THRESHOLD) / 0.1))
+        confidence = 0.3 + 0.7 * norm
+        return ClassificationResult(code=CODE, is_violation=True, confidence=confidence)
+
+    # 2) fallback: baseline 없으면 절대값 기준
+    if diff is None:
         return ok(CODE)
 
-    is_violation = value > THRESHOLD
+    is_violation = diff > ABS_THRESHOLD
     if not is_violation:
         return ok(CODE)
 
-    # threshold를 넘는 정도에 따라 confidence를 0~1로 스케일링
-    # 예) 0.03에서 시작해서 0.13 이상이면 1.0
-    confidence = min(1.0, max(0.0, (value - THRESHOLD) / 0.1))
+    norm = max(0.0, min(1.0, (diff - ABS_THRESHOLD) / 0.1))
+    confidence = 0.3 + 0.7 * norm
     return ClassificationResult(code=CODE, is_violation=True, confidence=confidence)
