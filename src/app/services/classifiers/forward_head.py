@@ -4,7 +4,7 @@ from .base import ClassificationResult, ok
 
 CODE = "FORWARD_HEAD"
 # 머리가 어깨 대비 이 정도 이상 앞으로 나오면 거북목으로 본다.
-THRESHOLD = 0.25
+THRESHOLD = 0.20
 
 def classify(metrics: Dict[str, Any]) -> ClassificationResult:
     """
