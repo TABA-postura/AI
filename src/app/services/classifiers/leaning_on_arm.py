@@ -5,9 +5,8 @@ from .base import ClassificationResult, ok
 CODE = "LEANING_ON_ARM"
 
 # 손-얼굴 거리(threshold)
-# 얼굴 크기(face_scale_raw)가 대략 0.1~0.2 정도 나올 때,
 # 0.18 이하면 '턱/뺨 근처까지 올라온 손' 정도로 본다.
-HAND_FACE_THRESHOLD = 0.18
+HAND_FACE_THRESHOLD = 0.20
 
 def classify(metrics: Dict[str, Any]) -> ClassificationResult:
     """

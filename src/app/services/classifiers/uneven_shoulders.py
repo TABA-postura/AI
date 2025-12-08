@@ -4,8 +4,8 @@ from .base import ClassificationResult, ok
 
 CODE = "UNEQUAL_SHOULDERS"
 
-# 어깨 높이 차이가 프레임 높이의 6% 이상이면 경고로 본다.
-THRESHOLD = 0.06  # 6%
+# 어깨 높이 차이가 프레임 높이의 5% 이상이면 경고로 본다.
+THRESHOLD = 0.04  # 6%
 
 def classify(metrics: Dict[str, Any]) -> ClassificationResult:
     """

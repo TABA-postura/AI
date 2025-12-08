@@ -5,7 +5,7 @@ from .base import ClassificationResult, ok
 CODE = "TOO_CLOSE"
 
 # baseline 대비 얼굴 크기가 이 이상 커지면 '너무 가까움'으로 간주
-DELTA_THRESHOLD = 0.05  # 예: 5% 이상 증가
+DELTA_THRESHOLD = 0.01  # 1% 이상 증가
 
 def classify(metrics: Dict[str, Any]) -> ClassificationResult:
     """
