@@ -1,6 +1,6 @@
 import json
 import logging
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Any, Dict, Optional
 
 import requests
@@ -14,18 +14,16 @@ LOG_URL = f"{settings.spring_base_url.rstrip('/')}{settings.spring_ai_log_path}"
 
 def _build_landmark_payload(result: Dict[str, Any]) -> Optional[str]:
     """
-    DB에 TEXT로 넣을 landmarkData 문자열을 만든다.
-    너무 크지 않은 선에서, 나중에 디버깅/재학습에 쓸 만한 정보 위주로 담자.
+    DB에 TEXT로 넣을 landmarkData 문자열을 만듦
     """
-    payload = {
+    detail_payload = {
         "state": result.get("state"),
         "violations": result.get("violations"),
         "metrics": result.get("metrics"),
-        "landmarks": result.get("landmarks"),
     }
 
     try:
-        return json.dumps(payload, ensure_ascii=False)
+        return json.dumps(detail_payload, ensure_ascii=False)
     except (TypeError, ValueError) as exc:
         logger.warning("Failed to serialize landmarkData: %s", exc)
         return None
@@ -51,8 +49,8 @@ def publish_to_backend(
         # 위반이 없으면 GOOD으로 통일
         posture_status = "GOOD"
 
-    # 2) 타임스탬프 (ISO8601, UTC 기준)
-    now_iso = datetime.now(timezone.utc).isoformat()
+    # 2) 타임스탬프 (초까지만)
+    now_iso = datetime.now().replace(microsecond=0).isoformat()
 
     # 3) landmarkData: JSON 문자열 (또는 None)
     landmark_str = _build_landmark_payload(result)
@@ -60,7 +58,6 @@ def publish_to_backend(
     payload: Dict[str, Any] = {
         "userId": user_id,
         "sessionId": session_id,
-        # 백엔드 DTO 필드명은 postureStatus 임
         "postureStatus": posture_status,
         "timestamp": now_iso,
         "landmarkData": landmark_str,
