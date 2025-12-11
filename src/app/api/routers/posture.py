@@ -7,7 +7,6 @@ router = APIRouter(prefix="/posture", tags=["posture"])
 
 @router.post("/analyze", response_model=AnalyzeResponse)
 async def analyze_posture(
-    userId: int = Form(...),
     sessionId: int = Form(...),
     reset: bool = Form(False),
     file: UploadFile = File(...),
@@ -21,8 +20,8 @@ async def analyze_posture(
 
     result = pipeline.run(
         image_bytes=image_bytes,
-        user_id=userId,
         session_id=sessionId,
+        reset=reset,
     )
 
     return result

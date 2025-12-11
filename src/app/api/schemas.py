@@ -59,10 +59,5 @@ class AnalyzeResponse(BaseModel):
 
 
 class AnalyzeRequestMeta(BaseModel):
-    """
-    실제로는 multipart(FormData)로 받지만,
-    FE/BE가 맞춰야 하는 공통 필드를 문서화용으로 정의.
-    """
-    userId: int
     sessionId: int
     reset: bool = False

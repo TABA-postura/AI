@@ -1,4 +1,4 @@
-from typing import Any, Dict, List
+from typing import Any, Optional, Dict, List
 import time
 import logging
 
@@ -30,8 +30,9 @@ from .classifiers.base import ClassificationResult
 
 def run(
     image_bytes: bytes,
-    user_id: int | None = None,
-    session_id: int | None = None,
+    *,
+    session_id: Optional[int] = None,
+    reset: bool = False,
 ) -> Dict[str, Any]:
 
     # 현재 시각(ms) - 나중에 should_process 등에서 쓸 수 있음
@@ -82,18 +83,17 @@ def run(
 
     # JSON 로그로 남기기
     log_inference(
-        user_id=user_id,
+        user_id=None,
         session_id=session_id,
         state=response["state"],
-        violations=response["violations"],
+        violations=response["violations"] or [],
         violation_details=violation_details,
     )
 
     # 백엔드 로그 전송 (user_id, session_id가 있을 때만)
-    if user_id is not None and session_id is not None:
+    if session_id is not None:
         try:
             exporter.publish_to_backend(
-                user_id=user_id,
                 session_id=session_id,
                 result=response,
             )
