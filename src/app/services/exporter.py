@@ -30,15 +30,14 @@ def _build_landmark_payload(result: Dict[str, Any]) -> Optional[str]:
 
 def publish_to_backend(
     *,
-    user_id: int,
     session_id: int,
     result: Dict[str, Any],
 ) -> None:
     """
     Spring Boot의 /ai/log 엔드포인트로 자세 로그를 전송한다.
 
-    - PostureLogRequest DTO 규격에 맞게 JSON을 구성해야 함.
-      (userId, sessionId, postureStatus, timestamp, landmarkData)
+    - 새로운 PostureLogRequest:
+      (sessionId, postureStatus, timestamp, landmarkData)
     """
     # 1) 어떤 자세 상태를 보낼지 결정
     violations = result.get("violations") or []
@@ -56,7 +55,6 @@ def publish_to_backend(
     landmark_str = _build_landmark_payload(result)
 
     payload: Dict[str, Any] = {
-        "userId": user_id,
         "sessionId": session_id,
         "postureStatus": posture_status,
         "timestamp": now_iso,
