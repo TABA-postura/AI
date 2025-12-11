@@ -57,25 +57,22 @@ def publish_to_backend(
     session_id: int,
     result: Dict[str, Any],
 ) -> None:
-    # 1) postureStatus 결정
-    posture_status = _select_posture_status(result)
+    
+    states = result.get("state", [])
+    
+    # 상태가 없다면 good을 보내고, 상태가 있으면 해당 상태들만 보내기
+    if not states:
+        states = ["GOOD"]
 
-    # 2) 타임스탬프 (초까지만) - BE는 LocalDateTime(예: 2025-11-17T13:30:00) 형태 기대
+    # 타임스탬프 (초까지만) - BE는 LocalDateTime(예: 2025-11-17T13:30:00) 형태 기대
     now_iso = datetime.now().replace(microsecond=0).isoformat()
 
-    # 3) (선택) landmarkData 만들기
-    landmark_data = _build_landmark_payload(result)
-
-    # 4) 최종 Payload 구성
+    # 최종 Payload 구성
     payload: Dict[str, Any] = {
         "sessionId": session_id,
-        "postureStatus": posture_status,
+        "postureStatus": states,
         "timestamp": now_iso,
     }
-
-    # BE DTO에 landmarkData 필드가 있다면, 아래 줄을 살려서 같이 보내도 됨
-    if landmark_data is not None:
-        payload["landmarkData"] = landmark_data
 
     try:
         resp = requests.post(LOG_URL, json=payload, timeout=0.5)
