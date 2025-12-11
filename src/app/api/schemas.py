@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Optional, Literal
+from typing import Dict, List, Optional, Literal
 
 from pydantic import BaseModel, Field
 
@@ -29,7 +29,7 @@ class AdviceItem(BaseModel):
 
 
 class AnalyzeResponse(BaseModel):
-    state: Literal["GOOD", "WARN", "ERROR"] = Field(
+    state: Literal["GOOD", "WARN", "ERROR", "UNKNOWN"] = Field(
         ...,
         description="전체 상태",
     )
