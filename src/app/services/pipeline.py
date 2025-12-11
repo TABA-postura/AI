@@ -27,6 +27,23 @@ from .classifiers import (
 )
 from .classifiers.base import ClassificationResult
 
+# 필수 포인트가 없는 경우
+REQUIRED_KEYS = ["LEFT_SHOULDER", "RIGHT_SHOULDER", "NOSE"]
+
+def _is_frame_reliable(posture_data: Dict[str, Any]) -> bool:
+    landmarks = posture_data.get("landmarks") or {}
+    if not isinstance(landmarks, dict):
+        return False
+
+    if not landmarks:
+        return False
+
+    # 필수 포인트 중 최소 2개 이상은 있어야 “신뢰 가능”으로 인정
+    hit = 0
+    for key in REQUIRED_KEYS:
+        if key in landmarks:
+            hit += 1
+    return hit >= 2
 
 def run(
     image_bytes: bytes,
@@ -35,15 +52,29 @@ def run(
     reset: bool = False,
 ) -> Dict[str, Any]:
 
-    # 현재 시각(ms) - 나중에 should_process 등에서 쓸 수 있음
+    # 현재 시각(ms)
     now_ms = int(time.time() * 1000)
 
-    # 1) 포즈 랜드마크 추출
+    # 0) 포즈 랜드마크 추출
     posture_data = detector.detect(image_bytes)
 
-    # (실시간 스트림 연동 시)
-    # if not tracker.should_process(now_ms):
-    #     이전 결과를 재사용하거나 바로 반환하는 로직을 넣을 수 있음.
+    # 1) 좌표 신뢰도 체크
+    if not _is_frame_reliable(posture_data):
+        # 이 프레임은 'UNKNOWN' 상태로 처리
+        response: Dict[str, Any] = {
+            "state": "UNKNOWN",
+            "violations": [],
+            "violation_details": [],
+            "advices": [
+                {
+                    "code": "UNKNOWN",
+                    "message": "사용자 자세를 인식할 수 없었습니다. 카메라 안에 상반신이 잘 보이도록 위치를 조정해 주세요.",
+                    "content_id": None,
+                }
+            ],
+            "metrics": {},
+            "timestamp_ms": now_ms,
+        }
 
     # 2) 트래킹/스무딩
     smoothed = tracker.smooth_landmarks(posture_data)

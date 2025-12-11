@@ -33,32 +33,26 @@ def publish_to_backend(
     session_id: int,
     result: Dict[str, Any],
 ) -> None:
-    """
-    Spring Boot의 /ai/log 엔드포인트로 자세 로그를 전송한다.
 
-    - 새로운 PostureLogRequest:
-      (sessionId, postureStatus, timestamp, landmarkData)
-    """
-    # 1) 어떤 자세 상태를 보낼지 결정
+    state = result.get("state")
     violations = result.get("violations") or []
+
     if violations:
-        # 가장 우선순위 높은 첫 번째 위반 코드를 postureStatus로 사용
+        # 가장 우선순위 높은 첫 번째 위반을 그대로 postureStatus로 사용
         posture_status = violations[0]
+    elif state and state != "GOOD":
+        # 위반은 없지만, GOOD도 아닌 상태 (UNKNOWN, ERROR 등)은 state 자체를 태깅
+        posture_status = state
     else:
-        # 위반이 없으면 GOOD으로 통일
         posture_status = "GOOD"
 
     # 2) 타임스탬프 (초까지만)
     now_iso = datetime.now().replace(microsecond=0).isoformat()
 
-    # 3) landmarkData: JSON 문자열 (또는 None)
-    landmark_str = _build_landmark_payload(result)
-
     payload: Dict[str, Any] = {
         "sessionId": session_id,
         "postureStatus": posture_status,
         "timestamp": now_iso,
-        "landmarkData": landmark_str,
     }
 
     try:
