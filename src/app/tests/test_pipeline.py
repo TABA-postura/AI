@@ -43,6 +43,33 @@ def test_pipeline_good_posture(monkeypatch):
     assert result["advices"][0]["code"] == "GOOD"
 
 
+def test_pipeline_unknown_state(monkeypatch):
+    # 랜드마크가 부족한 경우 (신뢰할 수 없는 프레임)
+    def fake_compute(_posture_data: Dict[str, Any]) -> Dict[str, float]:
+        return {}
+
+    def fake_aggregate(_results):
+        return {
+            "state": "UNKNOWN",
+            "violations": [],
+            "violation_details": [],
+        }
+
+    def fake_advise(_aggregate_result):
+        return [{"code": "UNKNOWN", "message": "자세를 인식할 수 없습니다.", "content_id": None}]
+
+    monkeypatch.setattr("app.services.detector.detect", _fake_detect)
+    monkeypatch.setattr("app.services.metrics.compute", fake_compute)
+    monkeypatch.setattr("app.services.aggregator.aggregate", fake_aggregate)
+    monkeypatch.setattr("app.services.advisor.advise", fake_advise)
+
+    result = pipeline.run(b"", user_id=1, session_id=1)
+
+    assert result["state"] == "UNKNOWN"
+    assert result["violations"] == []
+    assert result["advices"][0]["code"] == "UNKNOWN"
+    assert result["advices"][0]["message"] == "자세를 인식할 수 없습니다."
+
 def test_pipeline_forward_head(monkeypatch):
     # metrics: 거북목 위반 상황
     def fake_compute(_posture_data: Dict[str, Any]) -> Dict[str, float]:
