@@ -1,4 +1,4 @@
-# deploy.yml
+# 자동화
 name: CI/CD Pipeline
 
 on:
