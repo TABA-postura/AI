@@ -5,3 +5,7 @@ opencv-python
 numpy
 requests
 pytest
+tensorflow
+tensorflow-lite
+Pillow
+scikit-learn
