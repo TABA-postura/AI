@@ -8,3 +8,4 @@ pytest
 tensorflow
 tensorflow-lite
 Pillow
+scikit-learn
