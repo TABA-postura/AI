@@ -6,12 +6,12 @@ CODE = "LEANING_ON_ARM"
 
 # 손-얼굴 거리 기준 (0~1, 작을수록 얼굴에 가깝다고 가정)
 # 실제 데이터에 맞춰 0.3~0.5 사이에서 튜닝해 볼 것.
-HAND_FACE_THRESHOLD = 0.35
+HAND_FACE_THRESHOLD = 0.6
 
 # 팔 높이 비대칭 기준 (0~1, 값이 클수록 한쪽 팔이 더 높음)
 # elbow_height_diff / wrist_height_diff 둘 중 하나라도 이 값 이상이면
 # "한쪽 팔이 위로 많이 올라와 있다"고 판단.
-HEIGHT_DIFF_THRESHOLD = 0.08
+HEIGHT_DIFF_THRESHOLD = 0.02
 
 def classify(metrics: Dict[str, Any]) -> ClassificationResult:
     """
