@@ -1,5 +1,4 @@
 from typing import Dict, Any
-
 from .base import ClassificationResult, ok
 
 CODE = "FORWARD_HEAD"
@@ -57,9 +56,9 @@ def classify(metrics: Dict[str, Any]) -> ClassificationResult:
         return ok(CODE)
 
     # value가 ABS_THRESHOLD ~ ABS_STRONG 사이일 때 0~1로 정규화
-    severity = (value - ABS_THRESHOLD) / max(ABS_STRONG - ABS_THRESHOLD, 1e-6)
-    severity = max(0.0, min(1.0, severity))
-    confidence = 0.3 + 0.7 * severity
+    severity = int((value - ABS_THRESHOLD) / max(ABS_STRONG - ABS_THRESHOLD, 1e-6))  # 정수로 변환
+    severity = max(0, min(1, severity))  # 0~1 범위로 유지
+    confidence = 0.3 + 0.7 * severity  # confidence는 실수일 수 있음
 
     return ClassificationResult(
         code=CODE,
