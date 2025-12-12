@@ -1,64 +1,105 @@
-import tensorflow as tf
-from tensorflow.keras.preprocessing.image import ImageDataGenerator
-from tensorflow.keras.applications import MobileNetV2
-from tensorflow.keras import layers, models
+import json 
+import tensorflow as tf 
+from tensorflow.keras import layers, models 
+from tensorflow.keras.preprocessing.image import ImageDataGenerator 
+from tensorflow.keras.applications import MobileNetV2 
+from tensorflow.keras.applications.mobilenet_v2 import preprocess_input 
 
-from sklearn.utils import class_weight
-import numpy as np
+DATA_DIR = "data" 
+IMG_SIZE = (224, 224) 
+BATCH_SIZE = 32 
+VAL_SPLIT = 0.2 
+SEED = 42 
 
-# 사전 훈련된 MobileNetV2 모델 로드
-base_model = MobileNetV2(weights='imagenet', include_top=False, input_shape=(224, 224, 3))
+EPOCHS_STAGE1 = 10 
+EPOCHS_STAGE2 = 5 
 
-# 모델을 학습하지 않도록 고정
-base_model.trainable = False
+# MobileNetV2 권장 전처리 + 증강 
+datagen = ImageDataGenerator( 
+    preprocessing_function=preprocess_input, 
+    validation_split=VAL_SPLIT, 
+    rotation_range=10, 
+    width_shift_range=0.05, 
+    height_shift_range=0.05, 
+    zoom_range=0.1, 
+    horizontal_flip=True, 
+) 
 
-# 새로운 분류기 추가
-model = models.Sequential([
-    base_model,
-    layers.GlobalAveragePooling2D(),
-    layers.Dense(128, activation='relu'),
-    layers.Dense(1, activation='sigmoid')  # 거북목 (forward_head)과 정상 (normal)을 분류
-])
+train_data = datagen.flow_from_directory( 
+    DATA_DIR, 
+    target_size=IMG_SIZE, 
+    batch_size=BATCH_SIZE, 
+    subset="training", 
+    seed=SEED, 
+    shuffle=True, 
+    class_mode="categorical", 
+) 
 
-model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
+val_data = datagen.flow_from_directory( 
+    DATA_DIR, 
+    target_size=IMG_SIZE, 
+    batch_size=BATCH_SIZE, 
+    subset="validation", 
+    seed=SEED, 
+    shuffle=False, 
+    class_mode="categorical", 
+) 
 
-# 데이터 준비 (데이터 증강)
-train_datagen = ImageDataGenerator(
-    rescale=1./255,
-    shear_range=0.2,
-    zoom_range=0.2,
-    horizontal_flip=True,
-    rotation_range=40,  # 데이터 증강: 회전
-    width_shift_range=0.2,  # 데이터 증강: 가로 이동
-    height_shift_range=0.2  # 데이터 증강: 세로 이동
-)
+num_classes = len(train_data.class_indices) 
 
-validation_datagen = ImageDataGenerator(rescale=1./255)
+# 라벨 매핑 저장 (추론에서 그대로 사용) 
+with open("class_indices.json", "w", encoding="utf-8") as f: 
+    json.dump(train_data.class_indices, f, 
+              ensure_ascii=False, indent=2) 
+    
+base = MobileNetV2( 
+    weights="imagenet", 
+    include_top=False, 
+    input_shape=(IMG_SIZE[0], IMG_SIZE[1], 3), 
+) 
+base.trainable = False 
 
-# 학습 데이터 및 검증 데이터 불러오기
-train_data = train_datagen.flow_from_directory('data/train', target_size=(224, 224), batch_size=32, class_mode='binary')
-validation_data = validation_datagen.flow_from_directory('data/validation', target_size=(224, 224), batch_size=32, class_mode='binary')
+inputs = layers.Input(shape=(IMG_SIZE[0], IMG_SIZE[1], 3)) 
+x = base(inputs, training=False) 
+x = layers.GlobalAveragePooling2D()(x) 
+x = layers.Dropout(0.2)(x) 
+outputs = layers.Dense(num_classes, activation="softmax")(x) 
 
-# 클래스 가중치 계산 (불균형한 클래스에 대해 가중치를 조정)
-class_weights = class_weight.compute_class_weight(
-    'balanced', 
-    classes=np.unique(train_data.classes), 
-    y=train_data.classes
-)
+model = models.Model(inputs, outputs) 
+model.compile( 
+    optimizer=tf.keras.optimizers.Adam(1e-3), 
+    loss="categorical_crossentropy", 
+    metrics=["accuracy"], 
+) 
 
-class_weights_dict = {0: class_weights[0], 1: class_weights[1]}  # 정상 자세: 0, 거북목 자세: 1
+callbacks = [ 
+    tf.keras.callbacks.EarlyStopping(monitor="loss", patience=3, restore_best_weights=True),
+    tf.keras.callbacks.ReduceLROnPlateau(monitor="loss", patience=2, factor=0.5, min_lr=1e-6),
+    tf.keras.callbacks.ModelCheckpoint("my_model.h5", monitor="loss", save_best_only=True),
+] 
 
-# 모델 학습 (class_weight 적용)
-history = model.fit(
+#1단계: 헤드만 학습 
+model.fit( 
     train_data, 
-    epochs=10, 
-    validation_data=validation_data,
-    class_weight=class_weights_dict  # 클래스별 가중치 반영
-)
+    epochs=EPOCHS_STAGE1, 
+    callbacks=callbacks, 
+) 
 
-# 모델 저장
-model.save('forward_head_model.h5')
+# 2단계: 일부 파인튜닝(데이터 적으면 생략 가능) 
+base.trainable = True 
+for layer in base.layers[:-30]: 
+    layer.trainable = False 
 
-# 학습된 모델 평가
-test_loss, test_accuracy = model.evaluate(validation_data)
-print(f"Test Accuracy: {test_accuracy}")
+model.compile( 
+    optimizer=tf.keras.optimizers.Adam(1e-4), 
+    loss="categorical_crossentropy", 
+    metrics=["accuracy"], 
+) 
+
+model.fit( 
+    train_data, 
+    epochs=EPOCHS_STAGE2, 
+    callbacks=callbacks, 
+) 
+
+print("Saved my_model.h5 and class_indices.json")

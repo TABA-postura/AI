@@ -11,7 +11,6 @@ from . import (
     calibration,
     aggregator,
     advisor,
-    exporter,
 )
 
 logger = logging.getLogger(__name__)
@@ -76,6 +75,17 @@ def run(
             "timestamp_ms": now_ms,
         }
 
+        # UNKNOWN도 로그/BE전송이 필요하면 여기서 처리하고 return
+        log_inference(
+            user_id=None,
+            session_id=session_id,
+            state=response["state"],
+            violations=[],
+            violation_details=[],
+        )
+
+        return response
+
     # 2) 트래킹/스무딩
     smoothed = tracker.smooth_landmarks(posture_data)
 
@@ -112,24 +122,4 @@ def run(
         "timestamp_ms": now_ms, # 현재 시각
     }
 
-    # JSON 로그로 남기기
-    log_inference(
-        user_id=None,
-        session_id=session_id,
-        state=response["state"],
-        violations=response["violations"] or [],
-        violation_details=violation_details,
-    )
-
-    # 백엔드 로그 전송 (user_id, session_id가 있을 때만)
-    if session_id is not None:
-        try:
-            exporter.publish_to_backend(
-                session_id=session_id,
-                result=response,
-            )
-        except Exception as exc:  # 방어용
-            logger.warning("Failed to export posture log: %s", exc)
-
-    # TODO: exporter.publish_to_backend(response)
     return response

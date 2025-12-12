@@ -1,42 +1,45 @@
 from fastapi import APIRouter, UploadFile, File, Form
-from ...services import pipeline, tracker, calibration
+from ...services import pipeline, tracker, calibration, exporter
 from ..schemas import AnalyzeResponse
 
 from tensorflow.keras.models import load_model
+from tensorflow.keras.applications.mobilenet_v2 import preprocess_input
+
 import numpy as np
 import tensorflow as tf
+import json
+
+MODEL_PATH = "my_model.h5"
+LABEL_PATH = "class_indices.json"
+MODEL_CONF_TH = 0.70  # 필요 시 조정
 
 # 모델 로드
-model = load_model('forward_head_model.h5')
+model = load_model(MODEL_PATH)
 
-# 모델 예측 함수
-def predict_posture(image_bytes: bytes) -> str:
-    image = preprocess_image(image_bytes)  # 이미지를 전처리
+with open(LABEL_PATH, "r", encoding="utf-8") as f:
+    class_indices = json.load(f)
 
-    prediction = model.predict(image)
-    confidence = np.max(prediction)  # 모델 예측의 신뢰도
-    
-    # 예측 클래스 확인
-    prediction_class = np.argmax(prediction)
-    print("Prediction class:", prediction_class)
-    print("Model confidence:", confidence)
-    
-    # 신뢰도 기준으로 예측 결과를 결정
-    if confidence < 0.7:  # 신뢰도가 0.7 이상일 때만 예측을 받아들임
-        return "UNKNOWN"  # 신뢰도가 낮으면 'UNKNOWN' 처리
+if model.output_shape[-1] != len(class_indices):
+    raise RuntimeError("my_model.h5 와 class_indices.json 클래스 수 불일치")
 
-    if prediction_class == 1:  # 1이 "FORWARD_HEAD"에 해당한다고 가정
-        return "FORWARD_HEAD"
-    else:
-        return "GOOD"
+# index -> label
+idx_to_label = {int(v): k for k, v in class_indices.items()}
 
-# 이미지 전처리 함수
 def preprocess_image(image_bytes: bytes) -> np.ndarray:
     img = tf.image.decode_jpeg(image_bytes, channels=3)
-    img = tf.image.resize(img, (224, 224))  # 모델 입력 크기에 맞게 리사이즈
-    img = np.expand_dims(img, axis=0)  # 배치 차원 추가
-    img = img / 255.0  # 정규화
-    return img
+    img = tf.image.resize(img, (224, 224))
+    img = tf.cast(img, tf.float32)
+    img = preprocess_input(img)  # MobileNetV2 전용 전처리
+    img = tf.expand_dims(img, axis=0)
+    return img.numpy()
+
+def predict_multiclass(image_bytes: bytes):
+    x = preprocess_image(image_bytes)
+    probs = model.predict(x, verbose=0)[0]     # shape: (num_classes,)
+    top_idx = int(np.argmax(probs))
+    top_prob = float(probs[top_idx])
+    top_label = idx_to_label[top_idx]
+    return top_label, top_prob
 
 # FastAPI 라우터 코드
 router = APIRouter(prefix="/posture", tags=["posture"])
@@ -54,23 +57,40 @@ async def analyze_posture(
 
     image_bytes = await file.read()
 
-    # 규칙 기반 분석 (기존대로 진행)
+    # 규칙 기반 분석
     result = pipeline.run(
         image_bytes=image_bytes,
         session_id=sessionId,
         reset=reset,
     )
 
-    # 규칙 기반으로 "GOOD"이라면 모델 예측 생략
-    if result['state'] == "GOOD":
+    # 규칙 기반 결과가 GOOD/UNKNOWN/ERROR면 그대로 반환
+    if result["state"] in ("GOOD", "UNKNOWN", "ERROR"):
+        try:
+            exporter.publish_to_backend(session_id=sessionId, result=result)
+        except Exception:
+            pass
         return result
 
-    # 규칙 기반으로 거북목 판별 안되면 모델로 검증
-    model_based_result = predict_posture(image_bytes)
+    violations = result.get("violations", [])
 
-    # 모델 예측이 거북목이라면, 결과 반영
-    if model_based_result == "FORWARD_HEAD":
-        result["state"] = "WARN"
-        result["violations"].append("FORWARD_HEAD")
+    top_label, top_prob = predict_multiclass(image_bytes)
+
+    # 모델이 확신하고, GOOD이 아닐 때만 violations에 "추가"
+    if top_prob >= MODEL_CONF_TH and top_label != "GOOD":
+        if top_label not in violations:
+            violations.append(top_label)
+
+    # 방어적으로 정리(혹시라도 섞이면 제거)
+    violations = [v for v in violations if v and v not in ("GOOD", "UNKNOWN")]
+
+    result["violations"] = violations
+    result["state"] = "WARN" if violations else "GOOD"
+
+    # 최종 결과를 BE로 전송
+    try:
+        exporter.publish_to_backend(session_id=sessionId, result=result)
+    except Exception:
+        pass
 
     return result

@@ -1,89 +1,66 @@
 import json
 import logging
 from datetime import datetime
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List
 
 import requests
-
-from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
 # Spring Boot 서버 주소
-LOG_URL = f"http://13.239.176.67:8080"
+LOG_URL = f"http://13.239.176.67:8080/ai/log"
 
-def _build_landmark_payload(result: Dict[str, Any]) -> Optional[str]:
+def _select_posture_status(result: Dict[str, Any]) -> List[str]:
     """
-    DB에 TEXT로 넣을 landmarkData 문자열을 만듦
-    """
-    detail_payload = {
-        "state": result.get("state"),
-        "violations": result.get("violations") or [],
-    }
-
-    try:
-        return json.dumps(detail_payload, ensure_ascii=False)
-    except (TypeError, ValueError) as exc:
-        logger.warning("Failed to serialize landmarkData: %s", exc)
-        return None
-
-def _select_posture_status(result: Dict[str, Any]) -> str:
-    """
-    AI 내부 결과(state/violations)를 BE에서 요구하는 postureStatus 하나로 매핑.
-
-    - violations가 있으면: 가장 우선순위 높은 코드(violations[0])
-    - violations가 없고 state != GOOD 이면: UNKNOWN / ERROR 그대로 사용
-    - 나머지: GOOD
+    - state == GOOD    -> ["GOOD"]
+    - state == UNKNOWN -> ["UNKNOWN"]
+    - state == WARN    -> violations 배열 그대로(단, GOOD/UNKNOWN 등 섞이면 제거)
+    - 기타/예외        -> ["UNKNOWN"]
     """
     state = result.get("state")
     violations = result.get("violations") or []
 
-    # 1) 위반 자세가 하나 이상 있으면 → 다 보냄
-    if violations:
-        # 혹시 모를 타입 방어용으로 str() 한번 감싸줌
-        return [str(v) for v in violations]
+    # WARN이면 violations를 우선 사용
+    if state == "WARN":
+        cleaned = [str(v) for v in violations if v and v not in ("GOOD", "UNKNOWN", "ERROR", "WARN")]
+        return cleaned if cleaned else ["GOOD"]
 
-    # 2) 위반이 없을 때 → 메타 state 기준으로 단일 코드
+    # 그 외는 state로 단일 결정
     if state == "GOOD":
         return ["GOOD"]
     if state == "UNKNOWN":
         return ["UNKNOWN"]
 
-    # 3) ERROR 등 기타 상태는 일단 UNKNOWN으로 통일 (BE에서 별도 처리 원하면 여기 수정)
+    # ERROR 등 기타는 운영 정책에 맞게 처리
     return ["UNKNOWN"]
 
 def publish_to_backend(
     *,
     session_id: int,
     result: Dict[str, Any],
+    timeout_sec: float = 0.5,
 ) -> None:
     
-    states = result.get("state", [])
-    
-    # 상태가 없다면 good을 보내고, 상태가 있으면 해당 상태들만 보내기
-    if not states:
-        states = ["GOOD"]
-
-    # 타임스탬프 (초까지만) - BE는 LocalDateTime(예: 2025-11-17T13:30:00) 형태 기대
+    posture_states = _select_posture_status(result)
     now_iso = datetime.now().replace(microsecond=0).isoformat()
 
-    # 최종 Payload 구성
     payload: Dict[str, Any] = {
-        "sessionId": session_id,
-        "postureStatus": states,
+        "sessionId": int(session_id),
+        "postureStates": posture_states,
         "timestamp": now_iso,
     }
 
     try:
-        resp = requests.post(LOG_URL, json=payload, timeout=0.5)
+        resp = requests.post(LOG_URL, json=payload, timeout=timeout_sec)
     except requests.RequestException as exc:
-        # 백엔드가 죽어 있더라도 AI 분석은 계속 돌아가야 하므로 예외 삼킴
         logger.warning("Failed to send posture log to %s: %s", LOG_URL, exc)
         return
 
-    if resp.status_code != 202:
+    # 202 Accepted :contentReference[oaicite:9]{index=9}
+    if resp.status_code not in (200, 202):
         logger.warning(
-            "Unexpected status from /ai/log: %s %s",
+            "Unexpected status from %s: %s %s",
+            LOG_URL,
             resp.status_code,
-            resp.text[:200],
+            (resp.text or "")[:200],
         )
