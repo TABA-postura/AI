@@ -8,7 +8,6 @@ from app.core.errors import init_exception_handlers
 
 ALLOWED_ORIGINS = [
     "https://taba-postura.com",
-    "https://www.taba-postura.com",
     "http://localhost:5173",
     "http://localhost:3000",
 ]
