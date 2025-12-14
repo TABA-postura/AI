@@ -11,3 +11,4 @@ venv/
 README.md
 tests/
 scripts/
+data/
