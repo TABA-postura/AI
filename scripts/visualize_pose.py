@@ -69,5 +69,5 @@ def visualize(input_path: str, output_path: str = "pose_debug.png") -> None:
 
 if __name__ == "__main__":
     # 프로젝트 루트 기준 경로
-    test_image = r"C:\Users\USER\Documents\posture_test\yejin\5_leaning_on_arm.jpg"
+    test_image = r"C:\Users\USER\Documents\posture_test\doyeon\0_base.jpg"
     visualize(test_image, "pose_debug.png")

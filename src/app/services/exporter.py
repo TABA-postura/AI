@@ -15,11 +15,7 @@ def _build_log_url() -> str:
         path = "/" + path
     return f"{base}{path}"
 
-def _build_headers() -> Dict[str, str]:
-    token = os.getenv("SPRING_BEARER_TOKEN", "").strip()
-    if token:
-        return {"Authorization": f"Bearer {token}"}
-    return {}
+LOG_URL = _build_log_url()
 
 def _select_posture_status(result: Dict[str, Any]) -> List[str]:
     """
@@ -55,14 +51,11 @@ def publish_to_backend(*, session_id: int, result: Dict[str, Any], timeout_sec: 
         "timestamp": now_iso,
     }
 
-    url = _build_log_url()
-    headers = _build_headers()
-
     try:
-        resp = requests.post(url, json=payload, headers=headers, timeout=timeout_sec)
+        resp = requests.post(LOG_URL, json=payload, timeout=timeout_sec)
     except requests.RequestException as exc:
-        logger.warning("Failed to send posture log to %s: %s", url, exc)
+        logger.warning("Failed to send posture log to %s: %s", LOG_URL, exc)
         return
 
     if resp.status_code not in (200, 202):
-        logger.warning("Unexpected status from %s: %s %s", url, resp.status_code, (resp.text or "")[:200])
+        logger.warning("Unexpected status from %s: %s %s", LOG_URL, resp.status_code, (resp.text or "")[:200])
