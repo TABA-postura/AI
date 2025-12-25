@@ -12,8 +12,8 @@ class Settings(BaseModel):
     target_fps: float = 3.0
 
     # 백엔드(Spring) 연동
-    spring_base_url: str = "http://localhost:8080"
-    spring_ai_log_path: str = "/ai/log"
+    spring_base_url: str = "http://172.31.31.131:8080"
+    spring_ai_log_path: str = "api/ai/log"
 
     # 로깅
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
@@ -28,8 +28,8 @@ def get_settings() -> Settings:
     return Settings(
         app_name=os.getenv("APP_NAME", "Postura AI Server"),
         target_fps=float(os.getenv("TARGET_FPS", "3.0")),
-        spring_base_url=os.getenv("SPRING_BASE_URL", "http://localhost:8080"),
-        spring_ai_log_path=os.getenv("SPRING_AI_LOG_PATH", "/ai/log"),
+        spring_base_url=os.getenv("SPRING_BASE_URL", "http://172.31.31.131:8080"),
+        spring_ai_log_path=os.getenv("SPRING_AI_LOG_PATH", "api/ai/log"),
         log_level=os.getenv("LOG_LEVEL", "INFO").upper(),
     )
 
