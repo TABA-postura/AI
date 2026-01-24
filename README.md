@@ -1,7 +1,7 @@
 # 🧍 Posture Inference Server (FastAPI)
 
 Keras(H5) 모델 아티팩트(`.h5`)와 클래스 매핑(`class_indices.json`)을 기반으로, <br/>
-입력(이미지/프레임)에서 **사용자 자세를 판별**하고 전처리 → 추론 → 결과를 표준 포맷으로 반환하는 **AI 추론 백엔드 서버**입니다.  
+입력 프레임에서 **사용자 자세를 판별**하고 전처리 → 추론 → 결과를 표준 포맷으로 반환하는 **AI 추론 백엔드 서버**입니다.  
 웹 백엔드에서 호출 가능한 API를 제공하며, 파일럿 검증 지표(Accuracy/F1 등)와 재현 가능한 평가 흐름을 함께 관리합니다.
 > Real-time posture analysis inference backend (rule-based + model-based verification)
 
