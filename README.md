@@ -1,23 +1,25 @@
-# AI Inference Server (Posture / Classification)
+# 🧍 Posture Inference Server (FastAPI)
 
-Keras(H5) 모델 아티팩트(.h5)와 클래스 매핑(class_indices.json) 기반으로 <br/> 입력(이미지/프레임)을 전처리 → 추론 → 결과를 표준 포맷으로 반환하는 **AI 백엔드(추론) 서버**입니다.  
-웹 백엔드에서 호출 가능한 형태로 API를 제공하며, 모델 성능(정확도/F1/지연시간 등)과 재현 가능한 평가 파이프라인을 함께 관리합니다.
+Keras(H5) 모델 아티팩트(`.h5`)와 클래스 매핑(`class_indices.json`)을 기반으로, <br/>
+입력(이미지/프레임)에서 **사용자 자세를 판별**하고 전처리 → 추론 → 결과를 표준 포맷으로 반환하는 **AI 추론 백엔드 서버**입니다.  
+웹 백엔드에서 호출 가능한 API를 제공하며, 파일럿 검증 지표(Accuracy/F1 등)와 재현 가능한 평가 흐름을 함께 관리합니다.
+> Real-time posture analysis inference backend (rule-based + model-based verification)
 
-- 주요 목적: **자세/동작(또는 이미지) 분류 및 판별 결과 제공**
-- 제공 기능: **헬스 체크, 단일/배치 추론, (선택) 성능 평가/리포트 생성**
+- 주요 목적: **자세/동작(이미지) 분류 및 판별 결과 제공**
+- 제공 기능: **헬스 체크, 단일 추론, (선택) 성능 평가/리포트 생성**
 - 모델 아티팩트: `my_model.h5`, `class_indices.json`
 
 ---
 
 ## 🛠️ 기술 스택
 
-- 언어: ![Python](https://img.shields.io/badge/Python-3.11.9-3776AB?style=flat-square&logo=python&logoColor=white)
+- **Languages** : ![Python](https://img.shields.io/badge/Python-3.11.9-3776AB?style=flat-square&logo=python&logoColor=white)
   
-- 웹 프레임워크: ![FastAPI](https://img.shields.io/badge/FastAPI-Framework-009688?style=flat-square&logo=fastapi&logoColor=white)
-- 실행 서버: ![Uvicorn](https://img.shields.io/badge/Uvicorn-ASGI-000000?style=flat-square&logo=gunicorn&logoColor=white)
-- ML/CV: ![TensorFlow](https://img.shields.io/badge/TensorFlow-Keras(H5)-FF6F00?style=flat-square&logo=tensorflow&logoColor=white) ![OpenCV](https://img.shields.io/badge/OpenCV-Computer%20Vision-5C3EE8?style=flat-square&logo=opencv&logoColor=white) ![MediaPipe](https://img.shields.io/badge/MediaPipe-Pose%2FHands-0097A7?style=flat-square&logo=google&logoColor=white)
-- Data/Science: ![NumPy](https://img.shields.io/badge/NumPy-Scientific%20Computing-013243?style=flat-square&logo=numpy&logoColor=white) ![Pandas](https://img.shields.io/badge/Pandas-Data%20Analysis-150458?style=flat-square&logo=pandas&logoColor=white) ![scikit-learn](https://img.shields.io/badge/scikit--learn-ML%20Toolkit-F7931E?style=flat-square&logo=scikit-learn&logoColor=white)
-- Infra/DevOps: ![AWS](https://img.shields.io/badge/AWS-EC2-FF9900?style=flat-square&logo=amazonaws&logoColor=white) ![Docker](https://img.shields.io/badge/Docker-Container-2496ED?style=flat-square&logo=docker&logoColor=white) ![Actions](https://img.shields.io/badge/GitHub_Actions-CI/CD-2088FF?style=flat-square&logo=githubactions&logoColor=white) ![Nginx](https://img.shields.io/badge/Nginx-Reverse%20Proxy-009639?style=flat-square&logo=nginx&logoColor=white)
+- **Frameworks** : ![FastAPI](https://img.shields.io/badge/-FastAPI-009688?style=flat-square&logo=fastapi&logoColor=white)
+- **Libraries / ML / CV** : ![TensorFlow](https://img.shields.io/badge/-TensorFlow-FF6F00?style=flat-square&logo=tensorflow&logoColor=white) ![OpenCV](https://img.shields.io/badge/-OpenCV-5C3EE8?style=flat-square&logo=opencv&logoColor=white) ![MediaPipe](https://img.shields.io/badge/-MediaPipe-0097A7?style=flat-square&logo=google&logoColor=white)
+- **Data / Science** : ![NumPy](https://img.shields.io/badge/-NumPy-013243?style=flat-square&logo=numpy&logoColor=white) ![Pandas](https://img.shields.io/badge/-Pandas-150458?style=flat-square&logo=pandas&logoColor=white) ![scikit-learn](https://img.shields.io/badge/-scikit--learn-F7931E?style=flat-square&logo=scikit-learn&logoColor=white)
+- **DevOps / Infra** : ![AWS](https://img.shields.io/badge/AWS-EC2-FF9900?style=flat-square&logo=amazonaws&logoColor=white) ![Docker](https://img.shields.io/badge/Docker-Container-2496ED?style=flat-square&logo=docker&logoColor=white) ![GitHub Actions](https://img.shields.io/badge/GitHub_Actions-CI%2FCD-2088FF?style=flat-square&logo=githubactions&logoColor=white) ![Nginx](https://img.shields.io/badge/Nginx-Reverse%20Proxy-009639?style=flat-square&logo=nginx&logoColor=white)
+
 
 ---
 
@@ -40,7 +42,7 @@ Keras(H5) 모델 아티팩트(.h5)와 클래스 매핑(class_indices.json) 기�
 ## 📂 프로젝트 구조
 
 <details>
-  <summary><b>폴더/파일 트리 펼쳐보기</b></summary>
+  <summary><b><i>폴더/파일 트리 펼쳐보기</i></b></summary>
 
 ```text
 .
@@ -96,7 +98,7 @@ Keras(H5) 모델 아티팩트(.h5)와 클래스 매핑(class_indices.json) 기�
 ## 🔌 API 명세
 
 ### `POST /analyze`
-- 입력 이미지/프레임을 분석해 자세 상태(state), 위반 항목(violations), 코칭 메시지(advices), 핵심 메트릭(metrics) 을 반환합니다.
+입력 이미지/프레임을 분석해 자세 상태(state), 위반 항목(violations), 코칭 메시지(advices), 핵심 메트릭(metrics) 을 반환합니다.
 
 - **Request**
   - `Content-Type: multipart/form-data`
@@ -106,8 +108,9 @@ Keras(H5) 모델 아티팩트(.h5)와 클래스 매핑(class_indices.json) 기�
   curl -X POST "http://localhost:8000/analyze" \
     -F "image=@sample.jpg"
   ```
+
   <details>
-    <summary> Response 200 </summary>
+    <summary> <i>Response 200</i> </summary>
 
   ```json
   {
@@ -158,9 +161,9 @@ Keras(H5) 모델 아티팩트(.h5)와 클래스 매핑(class_indices.json) 기�
 
 ### `GET /health`
   - 서버 헬스 체크
-  ```bash
-  curl -X GET "http://localhost:8000/health"
-  ```
+    ```bash
+    curl -X GET "http://localhost:8000/health"
+    ```
 ---
 
 ## 🧩 판별 로직: 규칙 기반 + 모델 기반
@@ -170,7 +173,7 @@ Keras(H5) 모델 아티팩트(.h5)와 클래스 매핑(class_indices.json) 기�
 ### 설계
 - **1차 (규칙 기반)**: MediaPipe Pose/Hands 랜드마크로 메트릭을 계산해 **빠르고 해석 가능한 자세 판정** 수행
   <details>
-    <summary> 판별 기준 </summary>
+    <summary> <i>판별 기준</i> </summary>
   
     - **거북목(Forward Head)**
       - 지표: CVA(두개척추각) 기반 평가
@@ -185,13 +188,13 @@ Keras(H5) 모델 아티팩트(.h5)와 클래스 매핑(class_indices.json) 기�
   
   </details>
 
-- **2차 (모델 기반)**: 1차 결과가 애매한 경계 상황일 시 **분류 모델로 추가 검증**하여 **오탐 감소 및 신뢰도 보강**
+- **2차 (모델 기반)**: 1차 결과가 애매한 경계 상황일 시 **MobileNetV2 분류 모델로 추가 검증**하여 **오탐 감소 및 신뢰도 보강**
   <details>
-    <summary> 상세 설명 </summary>
+    <summary> <i>상세 설명</i> </summary>
   
   - **모델 사용 이유**: 규칙 기반이 어려운 케이스(복합 자세, 랜드마크 노이즈, 경계 상황)에서 오탐 감소 및 판단 보조
   
-  - **모델 선택 이유**: 경량성/실시간성을 고려한 MobileNetV2 분류 모델 채택
+  - **모델 선택 이유**: 경량성/실시간성을 고려한 MobileNetV2 채택
     
   - **학습 방식**: 웹캠 환경에서 수집한 자세 이미지로 멀티클래스 분류 학습, ImageNet 가중치로 전이학습(Transfer Learning) 적용
     
@@ -199,7 +202,7 @@ Keras(H5) 모델 아티팩트(.h5)와 클래스 매핑(class_indices.json) 기�
 
 - **결합 방식(Fusion/Gating)**: 아래 원칙을 기반으로 결합하여 **실시간성, 신뢰도 확보**
   <details>
-    <summary> 결합 원칙 </summary>
+    <summary> <i>결합 원칙</i> </summary>
 
   - **트리거 조건**
     - 규칙 기반이 WARN을 반환했거나
@@ -265,7 +268,7 @@ flowchart LR
 - F1(WARN): 93.33%
 
 <details>
-  <summary><b>지표 상세</b></summary>
+  <summary><b><i>지표 상세</i></b></summary>
   
   - Precision(WARN): 93.33% (448/480)
   - Specificity(GOOD): 79.08% (121/153)
